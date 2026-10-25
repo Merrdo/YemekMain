@@ -298,6 +298,23 @@ document.addEventListener('focusout',()=>{
   if(n&&n.closest&&n.closest('input,textarea'))return;
   e.preventDefault();
 }));
+/* iOS ana ekran uygulaması bazen 47px kısa pencereyle açılıyor (inner 797, ekran 844); ilk dokunuşta kendiliğinden düzeliyor.
+   Dokunuşu beklemeden yerleşimi birkaç farklı yolla tazeleyip pencere büyüyene kadar deniyoruz. */
+const short=()=>iosApp&&innerHeight>=innerWidth&&innerHeight<Math.max(screen.height,screen.width)-4;
+const nudges=[
+  ()=>{const m=document.querySelector('meta[name=viewport]');if(!m)return;const c=m.content;m.content='width=device-width,initial-scale=1,user-scalable=no';setTimeout(()=>{m.content=c},40)},
+  ()=>{const d=document.documentElement,b=document.body,sp=document.createElement('div');
+    sp.style.cssText='position:absolute;top:0;left:0;width:1px;height:'+(innerHeight+80)+'px;visibility:hidden;pointer-events:none';
+    d.style.overflow='auto';b.style.overflow='visible';b.style.height='auto';b.append(sp);scrollTo(0,2);
+    setTimeout(()=>{scrollTo(0,0);sp.remove();d.style.overflow='';b.style.overflow='';b.style.height='';fit()},70)},
+  ()=>{const a=document.getElementById('app');a.style.display='none';void a.offsetHeight;a.style.display='';dispatchEvent(new Event('resize'));fit()}
+];
+let healN=0;
+function heal(){if(!short())return;nudges[healN++%nudges.length]();setTimeout(fit,120)}
+[60,250,600,1100,1800,2800,4200].forEach(t=>setTimeout(heal,t));
+['touchstart','touchend'].forEach(t=>addEventListener(t,()=>{setTimeout(fit,0);setTimeout(fit,150);setTimeout(heal,250)},{passive:true,capture:true}));
+addEventListener('pageshow',()=>{healN=0;[80,400,900,1600].forEach(t=>setTimeout(heal,t))});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){healN=0;[80,400,900,1600].forEach(t=>setTimeout(heal,t))}});
 function h(tag,attrs,...kids){
   const el=document.createElement(tag);
   for(const [k,v] of Object.entries(attrs||{})){
