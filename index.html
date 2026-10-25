@@ -264,36 +264,8 @@ const Snd=(()=>{
 })();
 const sfx=Snd;
 ['pointerdown','touchend','keydown'].forEach(t=>addEventListener(t,()=>Snd.unlock(),{capture:true,passive:true}));
-/* Tam ekran yükseklik: iOS ana ekran uygulamasında klavye kapandıktan sonra görünüm alanı küçük kalabiliyor (alta boş şerit).
-   Gerçek ekran yüksekliğini kullanıp, takılı kalırsa yeniden ölçtürüyoruz. */
-const iosApp=navigator.standalone===true;
-let maxH=innerHeight;
-function fit(){
-  /* Ölçü kaynağı: ekran (390x844). 100vh kullanılmaz (iOS'ta 924.98 veriyor). Safe-area düzene hiç katılmaz. */
-  let ww=innerWidth,hh=innerHeight;
-  if(iosApp&&innerHeight>=innerWidth){ww=Math.min(screen.width,screen.height);hh=Math.max(screen.width,screen.height)}
-  const st=document.documentElement.style;
-  st.setProperty('--W',ww+'px');st.setProperty('--H',hh+'px');
-}
-function unstick(){
-  maxH=Math.max(maxH,innerHeight);
-  if(maxH-innerHeight>4){
-    const a=document.getElementById('app');
-    const keep=[...document.querySelectorAll('.scroll,.gal')].map(e=>[e,e.scrollTop,e.scrollLeft]);
-    a.style.display='none';void a.offsetHeight;a.style.display='';
-    keep.forEach(([e,t,l])=>{e.scrollTop=t;e.scrollLeft=l});
-  }
-  fit();
-}
-fit();
-addEventListener('resize',()=>{maxH=Math.max(maxH,innerHeight);fit()});
-addEventListener('orientationchange',()=>setTimeout(()=>{maxH=innerHeight;fit()},350));
-addEventListener('pageshow',()=>{fit();scrollTo(0,0)});
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){fit();scrollTo(0,0)}});
-document.addEventListener('focusout',()=>{
-  setTimeout(()=>{unstick();scrollTo(0,0)},160);
-  setTimeout(()=>{fit();scrollTo(0,0)},550);
-});
+/* Boyut sabit: 390x844, CSS'te (--W/--H). JS ile ölçme/yeniden hesaplama yok. */
+addEventListener('pageshow',()=>scrollTo(0,0));
 
 ['contextmenu','dragstart'].forEach(t=>document.addEventListener(t,e=>{
   const n=e.target&&e.target.nodeType===1?e.target:e.target&&e.target.parentElement;
