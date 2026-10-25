@@ -1,6 +1,6 @@
 /* Yemek Yapalım - service worker
    Uygulama dosyalarını değiştirdiğinde VERSION değerini artır. */
-const VERSION = 'v2';
+const VERSION = 'v3';
 const CORE = 'core-' + VERSION;
 const RUNTIME = 'runtime-' + VERSION;
 const PRECACHE = [

@@ -29,7 +29,7 @@ html,body{height:100%;overflow:hidden;background:var(--paper);overscroll-behavio
 body{font-family:var(--sans);color:var(--ink);-webkit-font-smoothing:antialiased;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 input,textarea{-webkit-user-select:text;user-select:text;font-family:var(--sans);color:var(--ink)}
 button{font-family:var(--sans);cursor:pointer;color:inherit}
-#app{position:fixed;inset:0;overflow:hidden;background:var(--paper)}
+#app{position:fixed;left:0;right:0;top:0;height:100%;overflow:hidden;background:var(--paper)}
 #grain{position:absolute;inset:0;pointer-events:none;z-index:900;opacity:.9}
 .view{position:absolute;inset:0;background:var(--paper);will-change:transform}
 .view.push{box-shadow:-18px 0 50px rgba(43,34,27,.14)}
@@ -58,7 +58,7 @@ button{font-family:var(--sans);cursor:pointer;color:inherit}
 .cats-in{position:relative;display:flex;gap:24px;width:max-content;padding-bottom:16px}
 .cat{background:none;border:0;padding:4px 0;font:400 25px var(--serif);font-variation-settings:"SOFT" 100,"opsz" 72;letter-spacing:-.01em;color:#ABA08F;transition:color .35s;white-space:nowrap}
 .cat.on{color:var(--ink)}
-.brush{position:absolute;left:0;bottom:0;height:14px;width:100%;pointer-events:none}
+.brush{position:absolute;left:-14px;bottom:0;height:14px;width:calc(100% + 28px);pointer-events:none}
 .info{display:flex;justify-content:space-between;align-items:center;padding:6px 26px 18px;animation:rise .9s .3s var(--ease) both}
 .count{font-size:13px;color:var(--ink2)}
 .sortb{display:flex;align-items:center;gap:8px;background:none;border:0;font-size:13px;color:var(--ink2);padding:6px 0 6px 10px}
@@ -158,7 +158,7 @@ button{font-family:var(--sans);cursor:pointer;color:inherit}
 .in::placeholder{color:#B3A593}
 textarea.in{resize:none;line-height:1.55;min-height:96px}
 .two{display:flex;gap:22px}.two>div{flex:1}
-.fg .cats{padding:0;margin-top:10px;animation:none}
+.fg .cats{padding:0 14px;margin:10px -14px 0;animation:none}
 .sheet-root{position:absolute;inset:0;z-index:100}
 .sheet-back{position:absolute;inset:0;background:rgba(30,20,12,.45)}
 .sheet{position:absolute;left:0;right:0;bottom:0;background:var(--paper);border-radius:30px 30px 0 0;padding:12px 24px calc(var(--sb) + 22px);box-shadow:0 -20px 60px rgba(0,0,0,.25)}
@@ -202,7 +202,35 @@ const CATCOL={'Çorba':'#C98446','Ana Yemek':'#A9502D','Hamur İşi':'#BF9A58','
 const EASE='cubic-bezier(.22,.9,.24,1)';
 const sfx=()=>{}; /* ses katmanı: ileride buraya bağlanacak (adım, kaydet, yıldız, deklanşör...) */
 const $=(s,r=document)=>r.querySelector(s);
-const setH=()=>document.documentElement.style.setProperty('--H',innerHeight+'px');setH();addEventListener('resize',setH);
+/* Tam ekran yükseklik: iOS ana ekran uygulamasında klavye kapandıktan sonra görünüm alanı küçük kalabiliyor (alta boş şerit).
+   Gerçek ekran yüksekliğini kullanıp, takılı kalırsa yeniden ölçtürüyoruz. */
+const iosApp=navigator.standalone===true;
+let maxH=innerHeight;
+function fit(){
+  let hh=innerHeight;
+  if(iosApp&&innerHeight>=innerWidth)hh=Math.max(innerHeight,screen.height,screen.width);
+  document.documentElement.style.setProperty('--H',hh+'px');
+  const a=document.getElementById('app');if(a)a.style.height=hh+'px';
+}
+function unstick(){
+  maxH=Math.max(maxH,innerHeight);
+  if(maxH-innerHeight>4){
+    const a=document.getElementById('app');
+    const keep=[...document.querySelectorAll('.scroll,.gal')].map(e=>[e,e.scrollTop,e.scrollLeft]);
+    a.style.display='none';void a.offsetHeight;a.style.display='';
+    keep.forEach(([e,t,l])=>{e.scrollTop=t;e.scrollLeft=l});
+  }
+  fit();
+}
+fit();
+addEventListener('resize',()=>{maxH=Math.max(maxH,innerHeight);fit()});
+addEventListener('orientationchange',()=>setTimeout(()=>{maxH=innerHeight;fit()},350));
+addEventListener('pageshow',()=>{fit();scrollTo(0,0)});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){fit();scrollTo(0,0)}});
+document.addEventListener('focusout',()=>{
+  setTimeout(()=>{unstick();scrollTo(0,0)},160);
+  setTimeout(()=>{fit();scrollTo(0,0)},550);
+});
 
 function h(tag,attrs,...kids){
   const el=document.createElement(tag);
@@ -311,13 +339,14 @@ function starPath(ctx,cx,cy,r){
   ctx.closePath();
 }
 function Stars({value=0,size=18,gap=4,interactive=false,onChange}){
-  const W=size*5+gap*4,H=Math.round(size*1.4);
-  const [cv,x]=canvas(W,H);cv.style.touchAction='pan-y';
+  const W=size*5+gap*4,pad=Math.ceil(size*.6),CW=W+pad*2,CH=size+pad*2;
+  const [cv,x]=canvas(CW,CH);cv.style.touchAction='pan-y';cv.style.margin=`-${pad}px`;cv.style.display='block';
+  cv.style.pointerEvents=interactive?'auto':'none';
   let val=value,anim=null;
   const draw=now=>{
-    x.clearRect(0,0,W,H);
+    x.clearRect(0,0,CW,CH);
     for(let i=0;i<5;i++){
-      const cx=i*(size+gap)+size/2,cy=H/2;let sc=1;
+      const cx=pad+i*(size+gap)+size/2,cy=pad+size/2;let sc=1;
       if(anim&&i<anim.upto){const p=Math.min(1,Math.max(0,(now-anim.t0-i*55)/340));sc=1+.4*Math.sin(Math.PI*p)}
       const r=size*.5*sc;starPath(x,cx,cy,r);x.lineJoin='round';x.lineWidth=r*.3;
       if(i<val){x.fillStyle=x.strokeStyle=SUN;x.fill();x.stroke()}
@@ -332,7 +361,7 @@ function Stars({value=0,size=18,gap=4,interactive=false,onChange}){
   if(interactive){
     const pick=(e,first)=>{
       const r=cv.getBoundingClientRect();
-      let i=Math.floor((e.clientX-r.left)/(size+gap))+1;i=Math.max(1,Math.min(5,i));
+      let i=Math.floor((e.clientX-r.left-pad)/(size+gap))+1;i=Math.max(1,Math.min(5,i));
       if(first&&i===val)i=0;
       if(i!==val){val=i;anim={t0:performance.now(),upto:i};run();sfx('star');onChange&&onChange(val)}
     };
@@ -371,9 +400,9 @@ function CatPicker(cats,value,onChange){
   inner.append(...btns,cv);wrap.append(inner);
   let cur=value,x0=0,x1=0,t0=0,t1=0,raf=0,seed=Math.random()*6;
   const target=()=>{const b=btns[cats.indexOf(cur)];return b?[b.offsetLeft,b.offsetLeft+b.offsetWidth]:[0,0]};
-  const size=()=>{const w=inner.offsetWidth;if(cv.width!==Math.round(w*DPR)){cv.width=Math.round(w*DPR);cv.height=Math.round(14*DPR)}};
+  const size=()=>{const w=inner.offsetWidth+28;if(cv.width!==Math.round(w*DPR)){cv.width=Math.round(w*DPR);cv.height=Math.round(14*DPR)}};
   const draw=()=>{
-    size();const g=cv.getContext('2d');g.setTransform(DPR,0,0,DPR,0,0);g.clearRect(0,0,cv.width,cv.height);
+    size();const g=cv.getContext('2d');g.setTransform(DPR,0,0,DPR,0,0);g.clearRect(0,0,cv.width,cv.height);g.translate(14,0);
     const a=Math.min(x0,x1),b=Math.max(x0,x1);if(b-a<2)return;
     g.lineCap=g.lineJoin='round';g.strokeStyle=CLAY;
     for(const [lw,al,off] of [[5.4,.92,0],[2.2,.5,2.4]]){
