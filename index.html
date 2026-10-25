@@ -9,7 +9,7 @@
 <meta name="theme-color" content="#F2EBDD">
 <title>Yemek Yapalım</title>
 <meta name="apple-mobile-web-app-title" content="Yemek Yapalım">
-<link rel="manifest" href="manifest.json">
+<!-- manifest bilerek yok: iOS ana ekran uygulamasında manifest varken pencere 47px kısa açılıyor; meta etiketleri yeterli -->
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="icon" type="image/png" href="icons/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -27,7 +27,7 @@
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
 html{height:100%;overflow:hidden;background:var(--pbg);overscroll-behavior:none}
-body{position:fixed;top:0;left:0;right:0;bottom:0;min-height:var(--H);overflow:hidden;background:var(--pbg);overscroll-behavior:none}
+body{height:100%;overflow:hidden;background:var(--pbg);overscroll-behavior:none}
 img,canvas{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;-webkit-user-drag:none}
 img{pointer-events:none}
 body{font-family:var(--sans);color:var(--ink);-webkit-font-smoothing:antialiased;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
@@ -293,7 +293,7 @@ document.addEventListener('focusout',()=>{
   setTimeout(()=>{fit();scrollTo(0,0)},550);
 });
 
-['contextmenu','dragstart','selectstart'].forEach(t=>document.addEventListener(t,e=>{
+['contextmenu','dragstart'].forEach(t=>document.addEventListener(t,e=>{
   const n=e.target&&e.target.nodeType===1?e.target:e.target&&e.target.parentElement;
   if(n&&n.closest&&n.closest('input,textarea'))return;
   e.preventDefault();
@@ -821,6 +821,15 @@ function openEditor(rec){
   setTimeout(()=>{grow(ingTa);grow(stepTa);grow(noteTa)},60);
 }
 
+/* ============ Tanı: tarih satırına 5 kez hızlı dokun ============ */
+(()=>{let n=0,t=0,box=null;const el=$('.eyebrow');if(!el)return;
+  el.addEventListener('click',()=>{const now=Date.now();n=now-t<600?n+1:1;t=now;if(n<5)return;n=0;
+    if(box){box.remove();box=null;return}
+    const r=$('#app').getBoundingClientRect(),vv=window.visualViewport||{};
+    box=h('pre',{style:'position:absolute;left:12px;right:12px;top:calc(var(--st) + 8px);z-index:999;background:rgba(0,0,0,.82);color:#9f9;font:12px/1.4 monospace;padding:10px;border-radius:12px;white-space:pre-wrap;user-select:text'},
+      `inner ${innerWidth}x${innerHeight}\nvv ${vv.width}x${vv.height}\nclient ${document.documentElement.clientWidth}x${document.documentElement.clientHeight}\nscreen ${screen.width}x${screen.height}\napp ${r.width}x${r.height} top ${r.top}\nH ${getComputedStyle(document.documentElement).getPropertyValue('--H')}\nsb ${getComputedStyle(document.documentElement).getPropertyValue('--sb')||''} standalone ${navigator.standalone}`);
+    app.append(box);});
+})();
 /* ============ PWA ============ */
 if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost')){
   addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
