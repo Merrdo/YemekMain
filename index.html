@@ -33,10 +33,7 @@ img{pointer-events:none}
 body{font-family:var(--sans);color:var(--ink);-webkit-font-smoothing:antialiased;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 input,textarea{-webkit-user-select:text;user-select:text;font-family:var(--sans);color:var(--ink)}
 button{font-family:var(--sans);cursor:pointer;color:inherit}
-/* Tam ekran: yükseklik JS ile (--H) kesin olarak veriliyor; alt güvenli alan şeridi kalmasın diye
-   uygulama görünür alanın en az tamamını kaplar (bottom'a güvenmiyoruz). */
-#app{position:fixed;left:0;top:0;width:100%;height:100%;height:var(--H);min-height:100%;overflow:hidden;background:var(--pbg)}
-#vp{position:fixed;left:0;top:0;width:1px;height:100vh;height:100lvh;visibility:hidden;pointer-events:none}
+#app{position:fixed;left:0;top:0;width:var(--W,100%);height:var(--H);overflow:hidden;background:var(--pbg)}
 .view{position:absolute;inset:0;background:var(--pbg);will-change:transform}
 #home{z-index:1}
 .scroll{position:absolute;inset:0;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;scrollbar-width:none}
@@ -189,7 +186,6 @@ textarea.in{resize:none;line-height:1.55;min-height:96px}
 </style>
 </head>
 <body>
-<div id="vp"></div>
 <div id="app">
   <section class="view" id="home"></section>
   <div id="toast"></div>
@@ -271,20 +267,60 @@ const sfx=Snd;
 /* Tam ekran yükseklik: iOS ana ekran uygulamasında klavye kapandıktan sonra görünüm alanı küçük kalabiliyor (alta boş şerit).
    Gerçek ekran yüksekliğini kullanıp, takılı kalırsa yeniden ölçtürüyoruz. */
 const iosApp=navigator.standalone===true;
-const mq=q=>{try{return matchMedia(q).matches}catch{return false}};
-const isApp=()=>iosApp||mq('(display-mode: standalone)')||mq('(display-mode: fullscreen)')||mq('(display-mode: minimal-ui)');
-const vpProbe=document.getElementById('vp');
 let maxH=innerHeight;
-function fit(){
-  const de=document.documentElement,vv=window.visualViewport;
-  /* her kaynaktan en büyüğü: hiçbir zaman görünür alandan kısa kalmaz */
-  let hh=Math.max(innerHeight,de.clientHeight||0,vv?Math.round(vv.height+vv.offsetTop):0);
-  if(isApp()){
-    /* ana ekran uygulaması: tarayıcı çubuğu yok, büyük görünüm alanı (lvh) gerçek yüksekliktir */
-    hh=Math.max(hh,vpProbe?vpProbe.offsetHeight:0);
-    if(iosApp&&innerHeight>=innerWidth)hh=Math.max(hh,screen.height,screen.width);
+/* Cihaz tablosu (CSS px, dikey): 'GxY':[üst güvenli alan, alt güvenli alan]
+   env() bazen 0 dönüyor / geç geliyor; bilinen modellerde tablo esas alınır, bilinmeyende env() kullanılır. */
+const DEV={
+  '320x568':[20,0],            // SE 1, 5s
+  '375x667':[20,0],            // SE 2/3, 6/7/8
+  '414x736':[20,0],            // 6/7/8 Plus
+  '375x812':[44,34],           // X, XS, 11 Pro (12/13 mini: env 50 ise o kullanılır)
+  '414x896':[null,34],         // XR/11 (dpr2) üst 48 · XS Max/11 Pro Max (dpr3) üst 44
+  '390x844':[47,34],           // 12, 12 Pro, 13, 13 Pro, 14
+  '428x926':[47,34],           // 12/13 Pro Max, 14 Plus
+  '393x852':[59,34],           // 14 Pro, 15, 15 Pro, 16
+  '430x932':[59,34],           // 14 Pro Max, 15 Plus, 15 Pro Max, 16 Plus
+  '402x874':[62,34],           // 16 Pro, 17, 17 Pro
+  '440x956':[62,34],           // 16 Pro Max, 17 Pro Max
+  '420x912':[null,34]          // iPhone Air (üst env'den)
+};
+let envT=0,envB=0;
+function probeEnv(){
+  try{
+    const p=document.createElement('div');
+    p.style.cssText='position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)';
+    document.documentElement.appendChild(p);
+    const cs=getComputedStyle(p);
+    envT=Math.max(envT,parseFloat(cs.paddingTop)||0);
+    envB=Math.max(envB,parseFloat(cs.paddingBottom)||0);
+    p.remove();
+  }catch{}
+}
+function metrics(){
+  const sw=Math.min(screen.width,screen.height),sh=Math.max(screen.width,screen.height);
+  const key=sw+'x'+sh,d=DEV[key];
+  let t=envT,b=envB;
+  if(d){
+    t=d[0]!=null?d[0]:(envT||0);
+    b=d[1];
+    if(key==='375x812'&&envT>=44)t=envT;
+    if(key==='414x896')t=devicePixelRatio>=3?44:48;
   }
-  de.style.setProperty('--H',Math.round(hh)+'px');
+  return{W:sw,H:sh,t,b,key,known:!!d};
+}
+function fit(){
+  const r=document.documentElement.style;
+  probeEnv();
+  if(iosApp&&innerHeight>=innerWidth){
+    const m=metrics();
+    r.setProperty('--W',m.W+'px');
+    r.setProperty('--H',m.H+'px');
+    r.setProperty('--st',m.t+'px');
+    r.setProperty('--sb',m.b+'px');
+  }else{
+    r.setProperty('--W','100%');
+    r.setProperty('--H',innerHeight+'px');
+  }
 }
 function unstick(){
   maxH=Math.max(maxH,innerHeight);
@@ -297,10 +333,6 @@ function unstick(){
   fit();
 }
 fit();
-/* iOS bazen ölçüleri geç bildirir: açılışta birkaç kez yeniden ölç */
-[50,200,500,1200,2500].forEach(t=>setTimeout(fit,t));
-addEventListener('load',fit);
-if(window.visualViewport)visualViewport.addEventListener('resize',fit);
 addEventListener('resize',()=>{maxH=Math.max(maxH,innerHeight);fit()});
 addEventListener('orientationchange',()=>setTimeout(()=>{maxH=innerHeight;fit()},350));
 addEventListener('pageshow',()=>{fit();scrollTo(0,0)});
@@ -844,7 +876,7 @@ function openEditor(rec){
     if(box){box.remove();box=null;return}
     const r=$('#app').getBoundingClientRect(),vv=window.visualViewport||{};
     box=h('pre',{style:'position:absolute;left:12px;right:12px;top:calc(var(--st) + 8px);z-index:999;background:rgba(0,0,0,.82);color:#9f9;font:12px/1.4 monospace;padding:10px;border-radius:12px;white-space:pre-wrap;user-select:text'},
-      `inner ${innerWidth}x${innerHeight}\nvv ${vv.width}x${vv.height}\nclient ${document.documentElement.clientWidth}x${document.documentElement.clientHeight}\nscreen ${screen.width}x${screen.height}\napp ${r.width}x${r.height} top ${r.top}\nH ${getComputedStyle(document.documentElement).getPropertyValue('--H')}\nsb ${getComputedStyle(document.documentElement).getPropertyValue('--sb')||''} standalone ${navigator.standalone}`);
+      `inner ${innerWidth}x${innerHeight}\nvv ${vv.width}x${vv.height}\nclient ${document.documentElement.clientWidth}x${document.documentElement.clientHeight}\nscreen ${screen.width}x${screen.height}\napp ${r.width}x${r.height} top ${r.top}\nH ${getComputedStyle(document.documentElement).getPropertyValue('--H')}\nst ${getComputedStyle(document.documentElement).getPropertyValue('--st')} sb ${getComputedStyle(document.documentElement).getPropertyValue('--sb')} W ${getComputedStyle(document.documentElement).getPropertyValue('--W')} model ${metrics().key} standalone ${navigator.standalone}`);
     app.append(box);});
 })();
 /* ============ PWA ============ */
